@@ -1,0 +1,172 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+local TweenService = game:GetService("TweenService")
+
+-- Variáveis de controle
+local autoFarm = false
+local autoCollect = false
+local autoStats = false
+local farmDelay = 1
+
+-- Criando GUI
+local ScreenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 320, 0, 420)
+Frame.Position = UDim2.new(0, 50, 0, 50)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.ClipsDescendants = true
+
+-- Título
+local title = Instance.new("TextLabel", Frame)
+title.Size = UDim2.new(1, 0, 0, 50)
+title.BackgroundTransparency = 1
+title.Text = "99 Noites PRO GUI"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 24
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- Função criar botão toggle animado
+local function createToggleButton(name, yPos, variable)
+    local btn = Instance.new("TextButton", Frame)
+    btn.Size = UDim2.new(0, 280, 0, 40)
+    btn.Position = UDim2.new(0, 20, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 18
+
+    local function updateText()
+        btn.Text = name .. " : " .. (variable() and "ON" or "OFF")
+        local color = variable() and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = color}):Play()
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        variable(not variable())
+        updateText()
+    end)
+
+    updateText()
+end
+
+-- Função criar slider animado
+local function createSlider(name, yPos, variable, min, max)
+    local label = Instance.new("TextLabel", Frame)
+    label.Size = UDim2.new(0, 280, 0, 25)
+    label.Position = UDim2.new(0, 20, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 16
+    label.Text = name .. ": " .. variable()
+
+    local sliderBg = Instance.new("Frame", Frame)
+    sliderBg.Size = UDim2.new(0, 280, 0, 15)
+    sliderBg.Position = UDim2.new(0, 20, 0, yPos+25)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    sliderBg.BorderSizePixel = 0
+
+    local sliderFill = Instance.new("Frame", sliderBg)
+    sliderFill.Size = UDim2.new((variable()-min)/(max-min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+    sliderFill.BorderSizePixel = 0
+
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local dragging = true
+            local function move(input)
+                local pos = math.clamp(input.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
+                local val = min + (pos / sliderBg.AbsoluteSize.X) * (max - min)
+                variable(val)
+                sliderFill.Size = UDim2.new((val-min)/(max-min), 0, 1, 0)
+                label.Text = name .. ": " .. string.format("%.2f", val)
+            end
+            local connection1
+            local connection2
+            connection1 = mouse.Move:Connect(move)
+            connection2 = mouse.Button1Up:Connect(function()
+                connection1:Disconnect()
+                connection2:Disconnect()
+            end)
+        end
+    end)
+end
+
+-- Variáveis acessíveis via função
+local function getAutoFarm() return autoFarm end
+local function setAutoFarm(val) autoFarm = val end
+local function getAutoCollect() return autoCollect end
+local function setAutoCollect(val) autoCollect = val end
+local function getAutoStats() return autoStats end
+local function setAutoStats(val) autoStats = val end
+local function getFarmDelay() return farmDelay end
+local function setFarmDelay(val) farmDelay = val end
+
+-- Criando botões e slider PRO
+createToggleButton("Auto-Farm", 80, function(val) if val~=nil then setAutoFarm(val) end return autoFarm end)
+createToggleButton("Auto-Coleta", 140, function(val) if val~=nil then setAutoCollect(val) end return autoCollect end)
+createToggleButton("Auto-Stats", 200, function(val) if val~=nil then setAutoStats(val) end return autoStats end)
+createSlider("Delay Auto-Farm", 260, setFarmDelay, 0.1, 5)
+
+-- Teleporte T + clique
+mouse.KeyDown:Connect(function(key)
+    if key == "t" then
+        local targetPos = mouse.Hit.p
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(targetPos)
+        end
+    end
+end)
+
+-- Auto-Farm de moedas
+spawn(function()
+    while wait(0.1) do
+        if autoFarm then
+            for _, coin in pairs(workspace:GetDescendants()) do
+                if coin.Name == "Coin" and coin:IsA("Part") then
+                    player.Character.HumanoidRootPart.CFrame = coin.CFrame
+                    wait(farmDelay)
+                end
+            end
+        end
+    end
+end)
+
+-- Auto-Coleta de itens
+spawn(function()
+    while wait(0.1) do
+        if autoCollect then
+            for _, item in pairs(workspace:GetDescendants()) do
+                if item:IsA("Tool") or item.Name == "Item" then
+                    player.Character.HumanoidRootPart.CFrame = item.CFrame
+                    wait(0.2)
+                    if item:IsA("Tool") then
+                        item.Parent = player.Backpack
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Aumentar Stats
+spawn(function()
+    while wait(1) do
+        if autoStats then
+            if player:FindFirstChild("leaderstats") then
+                if player.leaderstats:FindFirstChild("Level") then
+                    player.leaderstats.Level.Value = 999
+                end
+                if player.leaderstats:FindFirstChild("Strength") then
+                    player.leaderstats.Strength.Value = 999
+                end
+            end
+        end
+    end
+end)
